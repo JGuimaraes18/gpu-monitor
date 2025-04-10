@@ -68,6 +68,27 @@
     </div>
   </div>
 
+  <div class="col-12 mt-4">
+    <div class="card p-4">
+      <h5 class="mb-3 text-center">Histórico de Uso da GPU</h5>
+      <canvas id="gpuHistoryChart" style="max-height: 300px;"></canvas>
+    </div>
+  </div>
+  <div class="row g-4 mt-4">
+    <div class="col-md-6">
+      <div class="card p-4">
+        <h5 class="mb-3 text-center">Histórico de Temperatura (°C)</h5>
+        <canvas id="temperatureChart"></canvas>
+      </div>
+    </div>
+    <div class="col-md-6">
+      <div class="card p-4">
+        <h5 class="mb-3 text-center">Histórico de Memória Usada (MiB)</h5>
+        <canvas id="memoryChart"></canvas>
+      </div>
+    </div>
+  </div>
+
   <script>
     const themeToggle = document.getElementById("themeToggle");
     themeToggle.addEventListener("change", () => {
@@ -241,8 +262,65 @@
       renderCharts(data);
     }
 
+    async function fetchGpuHistory() {
+      try {
+        const res = await fetch("/api/gpu-history?limit=100");
+        const historyData = await res.json();
+
+        const timestamps = historyData[0].map(p => p.timestamp); // usamos para todos os gráficos
+
+        const createDataset = (label, key, colorShift = 0) => {
+          return Object.keys(historyData).map(gpuId => ({
+            label: `GPU ${gpuId}`,
+            data: historyData[gpuId].map(p => p[key]),
+            borderColor: `hsl(${(gpuId * 90 + colorShift) % 360}, 70%, 60%)`,
+            fill: false,
+            tension: 0.2
+          }));
+        };
+
+        const usageData = createDataset("Uso de GPU", "gpu_usage", 0);
+        const temperatureData = createDataset("Temperatura", "temperature", 30);
+        const memoryData = createDataset("Memória Usada", "mem_used", 60);
+
+        const createChart = (canvasId, datasets, label, maxY = null) => {
+          const ctx = document.getElementById(canvasId).getContext("2d");
+          return new Chart(ctx, {
+            type: "line",
+            data: {
+              labels: timestamps,
+              datasets: datasets
+            },
+            options: {
+              responsive: true,
+              plugins: {
+                legend: { position: "top" },
+                title: { display: true, text: label }
+              },
+              scales: {
+                y: {
+                  beginAtZero: true,
+                  ...(maxY ? { max: maxY } : {})
+                }
+              }
+            }
+          });
+        };
+
+        createChart("gpuHistoryChart", usageData, "Uso de GPU ao Longo do Tempo (%)", 100);
+        createChart("temperatureChart", temperatureData, "Temperatura ao Longo do Tempo (°C)");
+        createChart("memoryChart", memoryData, "Uso de Memória ao Longo do Tempo (MiB)");
+
+      } catch (e) {
+        console.error("Erro ao carregar histórico:", e);
+      }
+    }
+
+    fetchGpuHistory();
     fetchGpuData();
     setInterval(fetchGpuData, 10000);
+    setInterval(fetchGpuHistory, 10000);
+
   </script>
 </body>
 </html>

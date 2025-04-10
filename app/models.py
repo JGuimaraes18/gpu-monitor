@@ -1,4 +1,5 @@
 from .db import db
+from datetime import datetime
 
 class GpuUsage(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -6,6 +7,7 @@ class GpuUsage(db.Model):
     mem_used = db.Column(db.Integer, nullable=False)
     gpu_usage = db.Column(db.Integer, nullable=False)
     temperature = db.Column(db.Integer, nullable=False)
+    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
 
     users = db.relationship("GpuUser", backref="gpu_usage", lazy=True)
 

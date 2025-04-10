@@ -1,9 +1,8 @@
-from flask import render_template, jsonify
+from flask import render_template, jsonify, request
 from . import create_app
 from .models import GpuUsage, GpuUser
 from .db import db
 from dotenv import load_dotenv
-from datetime import datetime
 import subprocess
 import re
 import os
@@ -106,6 +105,31 @@ def save_to_db(data):
 def gpu_status():
     data = get_gpu_data()
     return jsonify(data)
+
+@app.route("/api/gpu-history")
+def gpu_history():
+    limit = int(request.args.get("limit", 100))  # Ex: últimos 20 registros por GPU
+    results = (
+        db.session.query(GpuUsage)
+        .order_by(GpuUsage.id.desc())
+        .limit(limit * 4)  # Considerando 4 GPUs
+        .all()
+    )
+
+    history = {}
+    for entry in reversed(results): 
+        gpu_id = entry.gpu_id
+        if gpu_id not in history:
+            history[gpu_id] = []
+        history[gpu_id].append({
+            "mem_used": entry.mem_used,
+            "gpu_usage": entry.gpu_usage,
+            "temperature": entry.temperature,
+            "timestamp": entry.timestamp.strftime("%d/%m %H:%M")
+ 
+        })
+
+    return jsonify(history)
 
 @app.route("/")
 def home():
