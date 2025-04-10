@@ -27,52 +27,6 @@ def get_gpu_data():
     data = []
     gpu_id = -1
 
-    # for line in lines_nvidia:
-    #     if re.search(r'\\d+W\\s+/\\s+\\d+W', line) and re.search(r'\\d+MiB\\s+/\\s+\\d+MiB', line):
-    #         print('entrou')
-    #         gpu_id += 1
-    #         match_power = re.search(r'(\\d+)W\\s+/\\s+(\\d+)W', line)
-    #         match_mem = re.search(r'(\\d+)MiB\\s+/\\s+(\\d+)MiB', line)
-
-    #         if match_power and match_mem:
-    #             power_used, power_cap = map(int, match_power.groups())
-    #             mem_used, mem_total = map(int, match_mem.groups())
-
-    #             data.append({
-    #                 "gpu": gpu_id,
-    #                 "power_usage": power_used,
-    #                 "power_cap": power_cap,
-    #                 "mem_used": mem_used,
-    #                 "mem_total": mem_total
-    #             })
-
-    # for line in lines_gpustat:
-    #     match = re.match(
-    #         r'\\[(\\d+)\\].*\\|\\s+(\\d+)[°\\\']C,\\s+(\\d+)\\s%\\s+\\|\\s+(\\d+)\\s/\\s+(\\d+)\\s+MB\\s+\\|\\s+([\\w\\.\\-]+)?\\((\\d+)M\\)?',
-    #         line
-    #     )
-    #     if match:
-    #         gpu_id = int(match.group(1))
-    #         temp = int(match.group(2))
-    #         usage = int(match.group(3))
-    #         user = match.group(6) or "Desconhecido"
-    #         user_mem = int(match.group(7))
-
-    #         if gpu_id < len(data):
-    #             gpu = data[gpu_id]
-    #             if "users" not in gpu:
-    #                 gpu["users"] = []
-
-    #             gpu["users"].append({
-    #                 "name": user,
-    #                 "mem": user_mem
-    #             })
-
-    #             gpu.update({
-    #                 "temperature": temp,
-    #                 "gpu_usage": usage
-    #             })
-
     for line in lines_nvidia:
         if re.search(r'\d+W\s+/\s+\d+W', line) and re.search(r'\d+MiB\s+/\s+\d+MiB', line):
             gpu_id += 1
@@ -93,15 +47,17 @@ def get_gpu_data():
 
     for line in lines_gpustat:
         match = re.match(
-            r'\[(\d+)\].*\|\s+(\d+)[°\']C,\s+(\d+)\s%\s+\|\s+(\d+)\s/\s+(\d+)\s+MB\s+\|\s+([\w\.\-]+)?\((\d+)M\)?',
+            r'\[(\d+)\].*?\|\s+(\d+)[°\']C,\s+(\d+)\s%\s+\|\s+(\d+)\s/\s+(\d+)\s+MB\s+\|?(?:\s+([\w\.\-]+)?\((\d+)M\))?',
             line
         )
         if match:
             gpu_id = int(match.group(1))
             temp = int(match.group(2))
             usage = int(match.group(3))
+            mem_used = int(match.group(4))
+            mem_total = int(match.group(5))
             user = match.group(6) or "Desconhecido"
-            user_mem = int(match.group(7))
+            user_mem = int(match.group(7)) if match.group(7) else 0
 
             if gpu_id < len(data):
                 gpu = data[gpu_id]
@@ -109,17 +65,19 @@ def get_gpu_data():
                 if "users" not in gpu:
                     gpu["users"] = []
 
-                gpu["users"].append({
-                    "name": user,
-                    "mem": user_mem
-                })
+                if user != "Desconhecido":  # adiciona o usuário só se ele existir
+                    gpu["users"].append({
+                        "name": user,
+                        "mem": user_mem
+                    })
 
                 gpu.update({
                     "temperature": temp,
-                    "gpu_usage": usage
+                    "gpu_usage": usage,
+                    "memory_used": mem_used,
+                    "memory_total": mem_total
                 })
-
-    print(data)
+    
     save_to_db(data)
     return data
 

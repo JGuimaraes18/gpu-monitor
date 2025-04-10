@@ -50,8 +50,7 @@
       </div>
     </div>
 
-    <div class="row g-4" id="statusContainer">
-    </div>
+    <div class="row g-4" id="statusContainer"></div>
 
     <div class="row g-4 mt-4">
       <div class="col-md-6">
@@ -75,22 +74,22 @@
       document.body.classList.toggle("dark-mode");
       document.body.classList.toggle("light-mode");
     });
-  
+
     function getStatusBadge(memUsed, powerUsage) {
       const isActive = memUsed > 10 || powerUsage > 30;
       return isActive
-        ? <span class="badge bg-success status-badge">🟢 Ativo</span>
-        : <span class="badge bg-danger status-badge">🔴 Inativo</span>;
+        ? `<span class="badge bg-success status-badge">🟢 Ativo</span>`
+        : `<span class="badge bg-danger status-badge">🔴 Inativo</span>`;
     }
-  
+
     function updateGpuStatus(data) {
       const container = document.getElementById("statusContainer");
       container.innerHTML = "";
-  
+
       data.forEach(gpu => {
         const col = document.createElement("div");
         col.className = "col-md-3";
-  
+
         const users = gpu.users || [];
         let usersHtml = "";
         if (users.length > 0) {
@@ -98,20 +97,20 @@
             <div class="mt-3 text-start">
               <strong>Usuários:</strong>
               <ul class="list-unstyled mb-0">
-                ${users.map(u => <li>👤 ${u.name} - ${u.mem} MiB</li>).join("")}
+                ${users.map(u => `<li>👤 ${u.name} - ${u.mem} MiB</li>`).join("")}
               </ul>
             </div>
           `;
         }
-  
+
         col.innerHTML = `
           <div class="card p-3 text-center">
             <h5>GPU ${gpu.gpu}</h5>
             ${getStatusBadge(gpu.mem_used, gpu.power_usage)}
             <p class="mt-2 mb-1">Temperatura: ${gpu.temperature || "?"}°C</p>
-            <p class="mb-1">Uso de GPU: ${gpu.gpu_usage || 0}%</p>
             <p class="mb-1">Memória: ${gpu.mem_used} / ${gpu.mem_total} MiB</p>
             <p class="mb-1">GPU: ${gpu.power_usage} / ${gpu.power_cap} W</p>
+            <p class="mb-1">Uso de GPU: ${gpu.gpu_usage || 0}%</p>
             ${usersHtml}
           </div>
         `;
@@ -125,19 +124,18 @@
         hash = name.charCodeAt(i) + ((hash << 5) - hash);
       }
       const hue = hash % 360;
-      return hsl(${hue}, 70%, 60%);
+      return `hsl(${hue}, 70%, 60%)`;
     }
-    
-  
+
     function renderCharts(data) {
-      const labels = data.map(g => GPU ${g.gpu});
-    
+      const labels = data.map(g => `GPU ${g.gpu}`);
+
       const userNames = Array.from(
         new Set(
           data.flatMap(g => (g.users || []).map(u => u.name))
         )
       );
-    
+
       const userDatasets = userNames.map(name => ({
         label: name,
         data: data.map(g => {
@@ -147,7 +145,7 @@
         backgroundColor: getRandomColor(name),
         stack: 'mem'
       }));
-    
+
       const outrosDataset = {
         label: "Sistema / Outros",
         data: data.map(g => {
@@ -165,13 +163,13 @@
         backgroundColor: "rgba(0, 123, 255, 0.2)",
         stack: 'cap'
       };
-    
+
       const powerUsed = data.map(g => g.power_usage);
       const powerCap = data.map(g => g.power_cap);
-    
+
       const memCtx = document.getElementById("memChart").getContext("2d");
       const powerCtx = document.getElementById("powerChart").getContext("2d");
-    
+
       memChart = new Chart(memCtx, {
         type: "bar",
         data: {
@@ -189,7 +187,7 @@
           }
         }
       });
-    
+
       powerChart = new Chart(powerCtx, {
         type: "bar",
         data: {
@@ -218,16 +216,15 @@
         }
       });
     }
-    
-  
+
     let memChart, powerChart;
-  
+
     async function fetchGpuData() {
       try {
         const response = await fetch("/api/gpu-status");
         const data = await response.json();
         updateGpuStatus(data);
-  
+
         if (memChart && powerChart) {
           updateCharts(data);
         } else {
@@ -237,15 +234,15 @@
         console.error("Erro ao buscar dados da GPU:", error);
       }
     }
+
     function updateCharts(data) {
       memChart.destroy();
       powerChart.destroy();
       renderCharts(data);
     }
-    
+
     fetchGpuData();
     setInterval(fetchGpuData, 10000);
   </script>
-  
 </body>
 </html>
