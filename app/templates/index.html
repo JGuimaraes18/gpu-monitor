@@ -88,29 +88,28 @@
       </div>
     </div>
   </div>
-
   <script>
     const themeToggle = document.getElementById("themeToggle");
     themeToggle.addEventListener("change", () => {
       document.body.classList.toggle("dark-mode");
       document.body.classList.toggle("light-mode");
     });
-
+  
     function getStatusBadge(memUsed, powerUsage) {
       const isActive = memUsed > 10 || powerUsage > 30;
       return isActive
         ? `<span class="badge bg-success status-badge">🟢 Ativo</span>`
         : `<span class="badge bg-danger status-badge">🔴 Inativo</span>`;
     }
-
+  
     function updateGpuStatus(data) {
       const container = document.getElementById("statusContainer");
       container.innerHTML = "";
-
+  
       data.forEach(gpu => {
         const col = document.createElement("div");
         col.className = "col-md-3";
-
+  
         const users = gpu.users || [];
         let usersHtml = "";
         if (users.length > 0) {
@@ -123,7 +122,7 @@
             </div>
           `;
         }
-
+  
         col.innerHTML = `
           <div class="card p-3 text-center">
             <h5>GPU ${gpu.gpu}</h5>
@@ -138,7 +137,7 @@
         container.appendChild(col);
       });
     }
-
+  
     function getRandomColor(name) {
       let hash = 0;
       for (let i = 0; i < name.length; i++) {
@@ -147,16 +146,14 @@
       const hue = hash % 360;
       return `hsl(${hue}, 70%, 60%)`;
     }
-
+  
     function renderCharts(data) {
       const labels = data.map(g => `GPU ${g.gpu}`);
-
+  
       const userNames = Array.from(
-        new Set(
-          data.flatMap(g => (g.users || []).map(u => u.name))
-        )
+        new Set(data.flatMap(g => (g.users || []).map(u => u.name)))
       );
-
+  
       const userDatasets = userNames.map(name => ({
         label: name,
         data: data.map(g => {
@@ -166,7 +163,7 @@
         backgroundColor: getRandomColor(name),
         stack: 'mem'
       }));
-
+  
       const outrosDataset = {
         label: "Sistema / Outros",
         data: data.map(g => {
@@ -177,20 +174,20 @@
         backgroundColor: "rgba(100, 100, 100, 0.6)",
         stack: 'mem'
       };
-
+  
       const totalMemDataset = {
         label: "Capacidade Total",
         data: data.map(g => g.mem_total),
         backgroundColor: "rgba(0, 123, 255, 0.2)",
         stack: 'cap'
       };
-
+  
       const powerUsed = data.map(g => g.power_usage);
       const powerCap = data.map(g => g.power_cap);
-
+  
       const memCtx = document.getElementById("memChart").getContext("2d");
       const powerCtx = document.getElementById("powerChart").getContext("2d");
-
+  
       memChart = new Chart(memCtx, {
         type: "bar",
         data: {
@@ -208,7 +205,7 @@
           }
         }
       });
-
+  
       powerChart = new Chart(powerCtx, {
         type: "bar",
         data: {
@@ -237,15 +234,16 @@
         }
       });
     }
-
+  
     let memChart, powerChart;
-
+    let gpuUsageChart, temperatureChart, memoryChart;
+  
     async function fetchGpuData() {
       try {
         const response = await fetch("/api/gpu-status");
         const data = await response.json();
         updateGpuStatus(data);
-
+  
         if (memChart && powerChart) {
           updateCharts(data);
         } else {
@@ -255,21 +253,22 @@
         console.error("Erro ao buscar dados da GPU:", error);
       }
     }
-
+  
     function updateCharts(data) {
       memChart.destroy();
       powerChart.destroy();
       renderCharts(data);
     }
-
+  
     async function fetchGpuHistory() {
       try {
         const res = await fetch("/api/gpu-history?limit=100");
         const historyData = await res.json();
+  
+        const labels = historyData[0].map(p => p.timestamp);
 
-        const timestamps = historyData[0].map(p => p.timestamp); // usamos para todos os gráficos
-
-        const createDataset = (label, key, colorShift = 0) => {
+  
+        const createDataset = (key, colorShift = 0) => {
           return Object.keys(historyData).map(gpuId => ({
             label: `GPU ${gpuId}`,
             data: historyData[gpuId].map(p => p[key]),
@@ -278,49 +277,54 @@
             tension: 0.2
           }));
         };
-
-        const usageData = createDataset("Uso de GPU", "gpu_usage", 0);
-        const temperatureData = createDataset("Temperatura", "temperature", 30);
-        const memoryData = createDataset("Memória Usada", "mem_used", 60);
-
-        const createChart = (canvasId, datasets, label, maxY = null) => {
+  
+        const usageData = createDataset("gpu_usage", 0);
+        const temperatureData = createDataset("temperature", 30);
+        const memoryData = createDataset("mem_used", 60);
+  
+        const updateOrCreate = (canvasId, chartVar, datasets, title, maxY = null) => {
           const ctx = document.getElementById(canvasId).getContext("2d");
-          return new Chart(ctx, {
-            type: "line",
-            data: {
-              labels: timestamps,
-              datasets: datasets
-            },
-            options: {
-              responsive: true,
-              plugins: {
-                legend: { position: "top" },
-                title: { display: true, text: label }
+          if (chartVar) {
+            chartVar.data.labels = labels;
+            chartVar.data.datasets = datasets;
+            chartVar.update();
+          } else {
+            chartVar = new Chart(ctx, {
+              type: "line",
+              data: {
+                labels: labels,
+                datasets: datasets
               },
-              scales: {
-                y: {
-                  beginAtZero: true,
-                  ...(maxY ? { max: maxY } : {})
+              options: {
+                responsive: true,
+                plugins: {
+                  legend: { position: "top" },
+                  title: { display: true, text: title }
+                },
+                scales: {
+                  y: {
+                    beginAtZero: true,
+                    ...(maxY ? { max: maxY } : {})
+                  }
                 }
               }
-            }
-          });
+            });
+          }
+          return chartVar;
         };
-
-        createChart("gpuHistoryChart", usageData, "Uso de GPU ao Longo do Tempo (%)", 100);
-        createChart("temperatureChart", temperatureData, "Temperatura ao Longo do Tempo (°C)");
-        createChart("memoryChart", memoryData, "Uso de Memória ao Longo do Tempo (MiB)");
-
+  
+        gpuUsageChart = updateOrCreate("gpuHistoryChart", gpuUsageChart, usageData, "Uso de GPU ao Longo do Tempo (%)", 100);
+        temperatureChart = updateOrCreate("temperatureChart", temperatureChart, temperatureData, "Temperatura ao Longo do Tempo (°C)");
+        memoryChart = updateOrCreate("memoryChart", memoryChart, memoryData, "Uso de Memória ao Longo do Tempo (MiB)");
       } catch (e) {
         console.error("Erro ao carregar histórico:", e);
       }
     }
-
-    fetchGpuHistory();
+  
     fetchGpuData();
+    fetchGpuHistory();
     setInterval(fetchGpuData, 10000);
     setInterval(fetchGpuHistory, 10000);
-
   </script>
 </body>
 </html>
