@@ -1,0 +1,45 @@
+version: '3.8'
+
+services:
+  flaskapp:
+    image: monitor-gpu:1.0
+    container_name: monitor-gpu
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    ports:
+      - "5000:5000"
+    volumes:
+      - ..:/app
+      - ../ssh:/root/.ssh:ro
+    env_file:
+      - ../.env
+    environment:
+      - PYTHONUNBUFFERED=1
+    networks:
+      - gpu_net
+    depends_on:
+      - db
+    entrypoint: ["/wait-for-mysql.sh"]
+    command: ["python", "-m", "app.main"]
+
+  db:
+    image: mysql:8.0
+    container_name: mysql-gpu
+    restart: always
+    environment:
+      MYSQL_DATABASE: 'gpu_monitor'
+      MYSQL_ROOT_PASSWORD: 'password'  
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    networks:
+      - gpu_net
+
+volumes:
+  mysql_data:
+
+networks:
+  gpu_net:
+    driver: bridge
