@@ -1,0 +1,9 @@
+SSH_USER=usuario
+SSH_PASS=senha
+SSH_HOST=ip
+
+DB_USER=
+DB_PASS=
+DB_NAME=gpu_monitor
+DB_HOST=mysql-gpu
+DB_PORT=3306
