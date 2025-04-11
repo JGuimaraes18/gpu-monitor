@@ -9,27 +9,8 @@ import os
 from collections import defaultdict
 from datetime import datetime, timedelta
 
-
 load_dotenv()
 app = create_app()
-
-def filter_grapich_24h(gpu_data):
-    now = datetime.now()
-    limite_inferior = now - timedelta(hours=24)
-
-    result = {}
-
-    for gpu_id, register in gpu_data.items():
-        filter_register = []
-        for r in register:
-            ts = datetime.strptime(r['timestamp'], '%d/%m %H:%M')
-            ts = ts.replace(year=now.year)
-            if limite_inferior <= ts <= now:
-                filter_register.append(r)
-
-        result[gpu_id] = filter_register
-
-    return result
 
 def get_gpu_data():
     usuario = os.getenv("SSH_USER")
@@ -122,24 +103,15 @@ def save_to_db(data):
 
     db.session.commit()
 
-@app.route("/api/gpu-status")
-def gpu_status():
-    data = get_gpu_data()
-    return jsonify(data)
+def get_gpu_data_last_24h():
+    now = datetime.utcnow()
+    limite_inferior = now - timedelta(hours=24)
 
-@app.route("/api/gpu-history")
-def gpu_history():
-    limit = int(request.args.get("limit", 100))
-    results = (
-        db.session.query(GpuUsage)
-        .order_by(GpuUsage.id.desc())
-        .limit(limit * 4)
-        .all()
-    )
+    registros = GpuUsage.query.filter(GpuUsage.timestamp >= limite_inferior).order_by(GpuUsage.timestamp).all()
 
     grouped = defaultdict(lambda: defaultdict(list))
 
-    for entry in results:
+    for entry in registros:
         gpu_id = entry.gpu_id
         hkey = entry.timestamp.replace(minute=0, second=0, microsecond=0)
         grouped[gpu_id][hkey].append(entry)
@@ -161,9 +133,17 @@ def gpu_history():
                 "timestamp": h_key.strftime("%d/%m %H:%M")
             })
 
-    history_f = filter_grapich_24h(history)
-    return jsonify(history_f)
+    return history
 
+@app.route("/api/gpu-status")
+def gpu_status():
+    data = get_gpu_data()
+    return jsonify(data)
+
+@app.route("/api/gpu-history")
+def gpu_history():
+    history = get_gpu_data_last_24h()
+    return jsonify(history)
 
 @app.route("/")
 def home():
