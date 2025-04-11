@@ -6,9 +6,30 @@ from dotenv import load_dotenv
 import subprocess
 import re
 import os
+from collections import defaultdict
+from datetime import datetime, timedelta
+
 
 load_dotenv()
 app = create_app()
+
+def filter_grapich_24h(gpu_data):
+    now = datetime.now()
+    limite_inferior = now - timedelta(hours=24)
+
+    result = {}
+
+    for gpu_id, register in gpu_data.items():
+        filter_register = []
+        for r in register:
+            ts = datetime.strptime(r['timestamp'], '%d/%m %H:%M')
+            ts = ts.replace(year=now.year)
+            if limite_inferior <= ts <= now:
+                filter_register.append(r)
+
+        result[gpu_id] = filter_register
+
+    return result
 
 def get_gpu_data():
     usuario = os.getenv("SSH_USER")
@@ -64,7 +85,7 @@ def get_gpu_data():
                 if "users" not in gpu:
                     gpu["users"] = []
 
-                if user != "Desconhecido":  # adiciona o usuário só se ele existir
+                if user != "Desconhecido":
                     gpu["users"].append({
                         "name": user,
                         "mem": user_mem
@@ -108,28 +129,41 @@ def gpu_status():
 
 @app.route("/api/gpu-history")
 def gpu_history():
-    limit = int(request.args.get("limit", 100))  # Ex: últimos 20 registros por GPU
+    limit = int(request.args.get("limit", 100))
     results = (
         db.session.query(GpuUsage)
         .order_by(GpuUsage.id.desc())
-        .limit(limit * 4)  # Considerando 4 GPUs
+        .limit(limit * 4)
         .all()
     )
 
-    history = {}
-    for entry in reversed(results): 
-        gpu_id = entry.gpu_id
-        if gpu_id not in history:
-            history[gpu_id] = []
-        history[gpu_id].append({
-            "mem_used": entry.mem_used,
-            "gpu_usage": entry.gpu_usage,
-            "temperature": entry.temperature,
-            "timestamp": entry.timestamp.strftime("%d/%m %H:%M")
- 
-        })
+    grouped = defaultdict(lambda: defaultdict(list))
 
-    return jsonify(history)
+    for entry in results:
+        gpu_id = entry.gpu_id
+        hkey = entry.timestamp.replace(minute=0, second=0, microsecond=0)
+        grouped[gpu_id][hkey].append(entry)
+
+    history = {}
+
+    for gpu_id, hours in grouped.items():
+        history[gpu_id] = []
+        for h_key, entries in sorted(hours.items()):
+            count = len(entries)
+            avg_mem_used = sum(e.mem_used for e in entries) / count
+            avg_gpu_usage = sum(e.gpu_usage for e in entries) / count
+            avg_temp = sum(e.temperature for e in entries) / count
+
+            history[gpu_id].append({
+                "mem_used": round(avg_mem_used, 2),
+                "gpu_usage": round(avg_gpu_usage, 2),
+                "temperature": round(avg_temp, 2),
+                "timestamp": h_key.strftime("%d/%m %H:%M")
+            })
+
+    history_f = filter_grapich_24h(history)
+    return jsonify(history_f)
+
 
 @app.route("/")
 def home():
