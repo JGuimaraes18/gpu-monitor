@@ -6,6 +6,8 @@ from dotenv import load_dotenv
 import subprocess
 import re
 import os
+from collections import defaultdict
+from datetime import datetime, timedelta
 
 load_dotenv()
 app = create_app()
@@ -64,7 +66,7 @@ def get_gpu_data():
                 if "users" not in gpu:
                     gpu["users"] = []
 
-                if user != "Desconhecido":  # adiciona o usuário só se ele existir
+                if user != "Desconhecido":
                     gpu["users"].append({
                         "name": user,
                         "mem": user_mem
@@ -101,6 +103,38 @@ def save_to_db(data):
 
     db.session.commit()
 
+def get_gpu_data_last_24h():
+    now = datetime.utcnow()
+    limite_inferior = now - timedelta(hours=24)
+
+    registros = GpuUsage.query.filter(GpuUsage.timestamp >= limite_inferior).order_by(GpuUsage.timestamp).all()
+
+    grouped = defaultdict(lambda: defaultdict(list))
+
+    for entry in registros:
+        gpu_id = entry.gpu_id
+        hkey = entry.timestamp.replace(minute=0, second=0, microsecond=0)
+        grouped[gpu_id][hkey].append(entry)
+
+    history = {}
+
+    for gpu_id, hours in grouped.items():
+        history[gpu_id] = []
+        for h_key, entries in sorted(hours.items()):
+            count = len(entries)
+            avg_mem_used = sum(e.mem_used for e in entries) / count
+            avg_gpu_usage = sum(e.gpu_usage for e in entries) / count
+            avg_temp = sum(e.temperature for e in entries) / count
+
+            history[gpu_id].append({
+                "mem_used": round(avg_mem_used, 2),
+                "gpu_usage": round(avg_gpu_usage, 2),
+                "temperature": round(avg_temp, 2),
+                "timestamp": h_key.strftime("%d/%m %H:%M")
+            })
+
+    return history
+
 @app.route("/api/gpu-status")
 def gpu_status():
     data = get_gpu_data()
@@ -108,27 +142,7 @@ def gpu_status():
 
 @app.route("/api/gpu-history")
 def gpu_history():
-    limit = int(request.args.get("limit", 100))  # Ex: últimos 20 registros por GPU
-    results = (
-        db.session.query(GpuUsage)
-        .order_by(GpuUsage.id.desc())
-        .limit(limit * 4)  # Considerando 4 GPUs
-        .all()
-    )
-
-    history = {}
-    for entry in reversed(results): 
-        gpu_id = entry.gpu_id
-        if gpu_id not in history:
-            history[gpu_id] = []
-        history[gpu_id].append({
-            "mem_used": entry.mem_used,
-            "gpu_usage": entry.gpu_usage,
-            "temperature": entry.temperature,
-            "timestamp": entry.timestamp.strftime("%d/%m %H:%M")
- 
-        })
-
+    history = get_gpu_data_last_24h()
     return jsonify(history)
 
 @app.route("/")
