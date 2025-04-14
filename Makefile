@@ -1,9 +1,7 @@
 DOCKER_DIR=docker
 
-# Alvo para subir os containers
 start:
-	docker-compose -f $(DOCKER_DIR)/docker-compose.yml up -d
+	docker-compose -f $(DOCKER_DIR)/docker-compose.yml up --build
 
-# Alvo para derrubar os containers
 stop:
 	docker-compose -f $(DOCKER_DIR)/docker-compose.yml down

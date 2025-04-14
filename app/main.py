@@ -9,6 +9,8 @@ import os
 from collections import defaultdict
 from datetime import datetime, timedelta
 from .error import error
+from app.zabbix.zabbix import connect_zabbix, get_HostsItems, get_hostgroup
+
 
 load_dotenv()
 app = create_app()
@@ -152,7 +154,127 @@ def gpu_history():
 @app.route("/")
 def home():
     gpu_data = get_gpu_data()
-    return render_template("index.html", gpu_data=gpu_data)
+    return render_template("cpu.html", gpu_data=gpu_data)
+
+def get_disk_usage_data_zabbix(items):
+    discos = {}
+
+    for i in items:
+        name = i['name']
+        value = i['lastvalue']
+
+        if 'Total space' in name or 'Used space' in name or 'Space utilization' in name:
+            nome_disco = name.split(':')[0].strip()
+
+            if nome_disco not in discos:
+                discos[nome_disco] = {}
+
+            if 'Total space' in name:
+                discos[nome_disco]['total'] = int(value)
+            elif 'Used space' in name:
+                discos[nome_disco]['used'] = int(value)
+            elif 'Space utilization' in name:
+                discos[nome_disco]['percent'] = float(value)
+
+    return discos
+
+def get_cpu_status_data_zabbix(items):
+    cpu_data = {
+        "utilization": None,
+        "idle_time": None,
+        "system_time": None,
+        "user_time": None,
+        "iowait_time": None,
+        "nice_time": None,
+        "guest_time": None,
+        "guest_nice_time": None,
+        "interrupt_time": None,
+        "softirq_time": None,
+        "steal_time": None
+    }
+
+    for item in items:
+        name = item["name"]
+        value = item["lastvalue"]
+
+        if name == "CPU utilization":
+            cpu_data["utilization"] = value
+        elif name == "CPU idle time":
+            cpu_data["idle_time"] = value
+        elif name == "CPU system time":
+            cpu_data["system_time"] = value
+        elif name == "CPU user time":
+            cpu_data["user_time"] = value
+        elif name == "CPU iowait time":
+            cpu_data["iowait_time"] = value
+        elif name == "CPU nice time":
+            cpu_data["nice_time"] = value
+        elif name == "CPU guest time":
+            cpu_data["guest_time"] = value
+        elif name == "CPU guest nice time":
+            cpu_data["guest_nice_time"] = value
+        elif name == "CPU interrupt time":
+            cpu_data["interrupt_time"] = value
+        elif name == "CPU softirq time":
+            cpu_data["softirq_time"] = value
+        elif name == "CPU steal time":
+            cpu_data["steal_time"] = value
+
+    return cpu_data
+
+
+# def get_cpu_status_data_zabbix(items):
+#     cpu_data = {
+#         "total_usage": None,
+#         "avg_freq": None,
+#         "temperature": None,
+#         "per_core_usage": {}
+#     }
+
+#     for item in items:
+#         name = item["name"]
+#         value = item["lastvalue"]
+
+#         if "Total Usage" in name:
+#             cpu_data["total_usage"] = float(value)
+#         elif "Average Frequency" in name:
+#             cpu_data["avg_freq"] = float(value)
+#         elif "Temperature" in name:
+#             cpu_data["temperature"] = float(value)
+#         elif "Core" in name and "Usage" in name:
+#             parts = name.split()
+#             core_index = int(parts[2])
+#             cpu_data["per_core_usage"][core_index] = float(value)
+
+#     sorted_cores = sorted(cpu_data["per_core_usage"].items())
+#     cpu_data["per_core_usage"] = [usage for _, usage in sorted_cores]
+
+#     return cpu_data
+
+
+# @app.route("/api/cpu-status")
+# def api_cpu_status():
+#     return jsonify({
+#         "total_usage": 23.5,
+#         "temperature": 65.0,
+#         "avg_freq": 2500.0,
+#         "per_core_usage": [20.1, 25.3, 22.7, 26.4]  # Exemplo com 4 núcleos
+#     })
+
+
+@app.route('/api/cpu-status')
+def cpu_check():
+    apt = connect_zabbix()
+    hostgroup_name = "pomerode"
+    hostgroup_info = get_hostgroup(hostgroup_name, apt)
+    hostgroup_id = ''
+    for gi in hostgroup_info:
+        if gi['groupid'] == '30':
+            hostgroup_id = gi['groupid']
+    hostgroups,hosts,items=get_HostsItems(apt, hostgroup_id)
+    i = get_cpu_status_data_zabbix(items)
+    print(f'get_disk_usage_data_zabbix: {items}')
+    return jsonify(i)
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", debug=True)

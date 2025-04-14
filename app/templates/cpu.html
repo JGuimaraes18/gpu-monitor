@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8" />
+  <title>Status da CPU</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    body.light-mode {
+      background-color: #f8f9fa;
+      color: #212529;
+    }
+
+    body.dark-mode {
+      background-color: #121212;
+      color: #f1f1f1;
+    }
+
+    .card {
+      border-radius: 15px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+
+    .dark-mode .card {
+      background-color: #1e1e1e;
+      box-shadow: 0 2px 10px rgba(255,255,255,0.05);
+      color: #f1f1f1;
+    }
+
+    .toggle-switch {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+    }
+
+    .status-badge {
+      font-size: 0.9rem;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body class="light-mode">
+  <div class="container py-5">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+      <h1 class="text-center w-100">Monitoramento da CPU</h1>
+      <div class="form-check form-switch toggle-switch">
+        <input class="form-check-input" type="checkbox" id="themeToggle">
+        <label class="form-check-label" for="themeToggle">🌙</label>
+      </div>
+    </div>
+
+    <div class="row g-4" id="cpuStatusContainer"></div>
+
+    <div class="row g-4 mt-4">
+      <div class="col-12">
+        <div class="card p-4">
+          <h5 class="mb-3 text-center">Uso da CPU por Núcleo (%)</h5>
+          <canvas id="cpuUsageChart"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <div class="row g-4 mt-4">
+      <div class="col-12">
+        <div class="card p-4">
+          <h5 class="mb-3 text-center">Histórico de Uso da CPU</h5>
+          <canvas id="cpuHistoryChart" style="max-height: 300px;"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const themeToggle = document.getElementById("themeToggle");
+    themeToggle.addEventListener("change", () => {
+      document.body.classList.toggle("dark-mode");
+      document.body.classList.toggle("light-mode");
+    });
+
+    function getStatusBadge(cpuUsage) {
+      return cpuUsage > 10
+        ? `<span class="badge bg-success status-badge">🟢 Ativo</span>`
+        : `<span class="badge bg-danger status-badge">🔴 Inativo</span>`;
+    }
+
+    function updateCpuStatus(data) {
+      const container = document.getElementById("cpuStatusContainer");
+      container.innerHTML = "";
+
+      const col = document.createElement("div");
+      col.className = "col-12";
+
+      col.innerHTML = `
+        <div class="card p-3 text-center">
+          <h5>CPU</h5>
+          ${getStatusBadge(data.total_usage)}
+          <p class="mt-2 mb-1">Uso Total: ${data.total_usage.toFixed(1)}%</p>
+          <p class="mb-1">Temperatura: ${data.temperature || "?"}°C</p>
+          <p class="mb-1">Frequência Média: ${data.avg_freq} MHz</p>
+        </div>
+      `;
+
+      container.appendChild(col);
+    }
+
+    let cpuUsageChart, cpuHistoryChart;
+
+    async function fetchCpuData() {
+      try {
+        const response = await fetch("/api/cpu-status");
+        const data = await response.json();
+        updateCpuStatus(data);
+
+        const labels = data.per_core_usage.map((_, i) => `Núcleo ${i}`);
+
+        if (cpuUsageChart) {
+          cpuUsageChart.data.labels = labels;
+          cpuUsageChart.data.datasets[0].data = data.per_core_usage;
+          cpuUsageChart.update();
+        } else {
+          const ctx = document.getElementById("cpuUsageChart").getContext("2d");
+          cpuUsageChart = new Chart(ctx, {
+            type: "bar",
+            data: {
+              labels: labels,
+              datasets: [{
+                label: "Uso (%)",
+                data: data.per_core_usage,
+                backgroundColor: "rgba(75, 192, 192, 0.6)"
+              }]
+            },
+            options: {
+              responsive: true,
+              plugins: {
+                legend: { position: "top" }
+              },
+              scales: {
+                y: { beginAtZero: true, max: 100 }
+              }
+            }
+          });
+        }
+      } catch (error) {
+        console.error("Erro ao buscar dados da CPU:", error);
+      }
+    }
+
+    async function fetchCpuHistory() {
+      try {
+        const res = await fetch("/api/cpu-history?limit=100");
+        const historyData = await res.json();
+        const labels = historyData.map(p => p.timestamp);
+        const usage = historyData.map(p => p.total_usage);
+
+        const ctx = document.getElementById("cpuHistoryChart").getContext("2d");
+        if (cpuHistoryChart) {
+          cpuHistoryChart.data.labels = labels;
+          cpuHistoryChart.data.datasets[0].data = usage;
+          cpuHistoryChart.update();
+        } else {
+          cpuHistoryChart = new Chart(ctx, {
+            type: "line",
+            data: {
+              labels: labels,
+              datasets: [{
+                label: "Uso Total da CPU (%)",
+                data: usage,
+                borderColor: "rgba(153, 102, 255, 0.8)",
+                backgroundColor: "rgba(153, 102, 255, 0.3)",
+                fill: true
+              }]
+            },
+            options: {
+              responsive: true,
+              plugins: {
+                legend: { position: "top" },
+                title: { display: true, text: "Histórico de Uso da CPU" }
+              },
+              scales: {
+                y: { beginAtZero: true, max: 100 }
+              }
+            }
+          });
+        }
+      } catch (e) {
+        console.error("Erro ao carregar histórico da CPU:", e);
+      }
+    }
+
+    fetchCpuData();
+    fetchCpuHistory();
+    setInterval(fetchCpuData, 10000);
+    setInterval(fetchCpuHistory, 10000);
+  </script>
+</body>
+</html>
