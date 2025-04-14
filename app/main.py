@@ -8,6 +8,7 @@ import re
 import os
 from collections import defaultdict
 from datetime import datetime, timedelta
+from .error import error
 
 load_dotenv()
 app = create_app()
@@ -77,7 +78,10 @@ def get_gpu_data():
                     "gpu_usage": usage,
                     "memory_used": mem_used,
                     "memory_total": mem_total
-                })
+                })     
+
+    if len(data) == 0:
+        return error
     
     save_to_db(data)
     return data
