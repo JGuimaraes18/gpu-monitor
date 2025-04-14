@@ -1,3 +1,4 @@
+import random
 from flask import render_template, jsonify, request
 from . import create_app
 from .models import GpuUsage, GpuUser
@@ -88,27 +89,6 @@ def get_gpu_data():
     save_to_db(data)
     return data
 
-def save_to_db(data):
-    for gpu in data:
-        usage = GpuUsage(
-            gpu_id=gpu["gpu"],
-            mem_used=gpu["mem_used"],
-            gpu_usage=gpu.get("gpu_usage", 0),
-            temperature=gpu.get("temperature", 0)
-        )
-        db.session.add(usage)
-        db.session.flush()
-
-        for user in gpu.get("users", []):
-            user_entry = GpuUser(
-                gpu_usage_id=usage.id,
-                name=user["name"],
-                mem=user["mem"]
-            )
-            db.session.add(user_entry)
-
-    db.session.commit()
-
 def get_gpu_data_last_24h():
     now = datetime.utcnow()
     limite_inferior = now - timedelta(hours=24)
@@ -141,21 +121,6 @@ def get_gpu_data_last_24h():
 
     return history
 
-@app.route("/api/gpu-status")
-def gpu_status():
-    data = get_gpu_data()
-    return jsonify(data)
-
-@app.route("/api/gpu-history")
-def gpu_history():
-    history = get_gpu_data_last_24h()
-    return jsonify(history)
-
-@app.route("/")
-def home():
-    gpu_data = get_gpu_data()
-    return render_template("cpu.html", gpu_data=gpu_data)
-
 def get_disk_usage_data_zabbix(items):
     discos = {}
 
@@ -178,8 +143,8 @@ def get_disk_usage_data_zabbix(items):
 
     return discos
 
-def get_cpu_status_data_zabbix(items):
-    cpu_data = {
+def get_status_data_zabbix(items):
+    data = {
         "utilization": None,
         "idle_time": None,
         "system_time": None,
@@ -190,7 +155,9 @@ def get_cpu_status_data_zabbix(items):
         "guest_nice_time": None,
         "interrupt_time": None,
         "softirq_time": None,
-        "steal_time": None
+        "steal_time": None,
+        "memory_total": None,
+        "memory_available": None
     }
 
     for item in items:
@@ -198,69 +165,33 @@ def get_cpu_status_data_zabbix(items):
         value = item["lastvalue"]
 
         if name == "CPU utilization":
-            cpu_data["utilization"] = value
+            data["utilization"] = value
         elif name == "CPU idle time":
-            cpu_data["idle_time"] = value
+            data["idle_time"] = value
         elif name == "CPU system time":
-            cpu_data["system_time"] = value
+            data["system_time"] = value
         elif name == "CPU user time":
-            cpu_data["user_time"] = value
+            data["user_time"] = value
         elif name == "CPU iowait time":
-            cpu_data["iowait_time"] = value
+            data["iowait_time"] = value
         elif name == "CPU nice time":
-            cpu_data["nice_time"] = value
+            data["nice_time"] = value
         elif name == "CPU guest time":
-            cpu_data["guest_time"] = value
+            data["guest_time"] = value
         elif name == "CPU guest nice time":
-            cpu_data["guest_nice_time"] = value
+            data["guest_nice_time"] = value
         elif name == "CPU interrupt time":
-            cpu_data["interrupt_time"] = value
+            data["interrupt_time"] = value
         elif name == "CPU softirq time":
-            cpu_data["softirq_time"] = value
+            data["softirq_time"] = value
         elif name == "CPU steal time":
-            cpu_data["steal_time"] = value
+            data["steal_time"] = value
+        elif name == "Available memory":
+            data["memory_available"] = float(value)
+        elif name == "Total memory":
+            data["memory_total"] = float(value)
 
-    return cpu_data
-
-
-# def get_cpu_status_data_zabbix(items):
-#     cpu_data = {
-#         "total_usage": None,
-#         "avg_freq": None,
-#         "temperature": None,
-#         "per_core_usage": {}
-#     }
-
-#     for item in items:
-#         name = item["name"]
-#         value = item["lastvalue"]
-
-#         if "Total Usage" in name:
-#             cpu_data["total_usage"] = float(value)
-#         elif "Average Frequency" in name:
-#             cpu_data["avg_freq"] = float(value)
-#         elif "Temperature" in name:
-#             cpu_data["temperature"] = float(value)
-#         elif "Core" in name and "Usage" in name:
-#             parts = name.split()
-#             core_index = int(parts[2])
-#             cpu_data["per_core_usage"][core_index] = float(value)
-
-#     sorted_cores = sorted(cpu_data["per_core_usage"].items())
-#     cpu_data["per_core_usage"] = [usage for _, usage in sorted_cores]
-
-#     return cpu_data
-
-
-# @app.route("/api/cpu-status")
-# def api_cpu_status():
-#     return jsonify({
-#         "total_usage": 23.5,
-#         "temperature": 65.0,
-#         "avg_freq": 2500.0,
-#         "per_core_usage": [20.1, 25.3, 22.7, 26.4]  # Exemplo com 4 núcleos
-#     })
-
+    return data
 
 @app.route('/api/cpu-status')
 def cpu_check():
@@ -272,9 +203,59 @@ def cpu_check():
         if gi['groupid'] == '30':
             hostgroup_id = gi['groupid']
     hostgroups,hosts,items=get_HostsItems(apt, hostgroup_id)
-    i = get_cpu_status_data_zabbix(items)
-    print(f'get_disk_usage_data_zabbix: {items}')
-    return jsonify(i)
+
+    data_raw = get_status_data_zabbix(items)
+
+    cpu_utilization = float(data_raw.get("utilization", 0.0)) 
+    cpu_total = cpu_utilization * 100
+
+    memory_available = data_raw.get("memory_available", 0.0)
+    memory_total = data_raw.get("memory_total", 1.0)
+    memory_usage = (1 - memory_available / memory_total) * 100
+
+    status = {
+        "total_usage": round(cpu_total, 2),
+        "memory_usage": round(memory_usage, 2)
+    }
+    # print(f'get_disk_usage_data_zabbix: {items}')
+    return jsonify(status)
+
+@app.route("/api/gpu-status")
+def gpu_status():
+    data = get_gpu_data()
+    return jsonify(data)
+
+@app.route("/api/gpu-history")
+def gpu_history():
+    history = get_gpu_data_last_24h()
+    return jsonify(history)
+
+def save_to_db(data):
+    for gpu in data:
+        usage = GpuUsage(
+            gpu_id=gpu["gpu"],
+            mem_used=gpu["mem_used"],
+            gpu_usage=gpu.get("gpu_usage", 0),
+            temperature=gpu.get("temperature", 0)
+        )
+        db.session.add(usage)
+        db.session.flush()
+
+        for user in gpu.get("users", []):
+            user_entry = GpuUser(
+                gpu_usage_id=usage.id,
+                name=user["name"],
+                mem=user["mem"]
+            )
+            db.session.add(user_entry)
+
+    db.session.commit()
+
+@app.route("/")
+def home():
+    gpu_data = get_gpu_data()
+    return render_template("index.html", gpu_data=gpu_data)
+
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", debug=True)

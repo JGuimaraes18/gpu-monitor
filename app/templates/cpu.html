@@ -2,7 +2,7 @@
 <html lang="pt-br">
 <head>
   <meta charset="UTF-8" />
-  <title>Status da CPU</title>
+  <title>CPU</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
@@ -53,10 +53,16 @@
     <div class="row g-4" id="cpuStatusContainer"></div>
 
     <div class="row g-4 mt-4">
-      <div class="col-12">
+      <div class="col-md-6">
         <div class="card p-4">
-          <h5 class="mb-3 text-center">Uso da CPU por Núcleo (%)</h5>
-          <canvas id="cpuUsageChart"></canvas>
+          <h5 class="mb-3 text-center">CPU</h5>
+          <canvas id="cpuBarChart" style="max-height: 300px;"></canvas>
+        </div>
+      </div>
+      <div class="col-md-6">
+        <div class="card p-4">
+          <h5 class="mb-3 text-center">Memória</h5>
+          <canvas id="memoryBarChart" style="max-height: 300px;"></canvas>
         </div>
       </div>
     </div>
@@ -77,63 +83,55 @@
       document.body.classList.toggle("dark-mode");
       document.body.classList.toggle("light-mode");
     });
-
-    function getStatusBadge(cpuUsage) {
-      return cpuUsage > 10
-        ? `<span class="badge bg-success status-badge">🟢 Ativo</span>`
-        : `<span class="badge bg-danger status-badge">🔴 Inativo</span>`;
-    }
-
+  
     function updateCpuStatus(data) {
       const container = document.getElementById("cpuStatusContainer");
       container.innerHTML = "";
-
+  
       const col = document.createElement("div");
       col.className = "col-12";
-
+  
       col.innerHTML = `
         <div class="card p-3 text-center">
           <h5>CPU</h5>
-          ${getStatusBadge(data.total_usage)}
           <p class="mt-2 mb-1">Uso Total: ${data.total_usage.toFixed(1)}%</p>
-          <p class="mb-1">Temperatura: ${data.temperature || "?"}°C</p>
-          <p class="mb-1">Frequência Média: ${data.avg_freq} MHz</p>
+          <p class="mb-1">Uso da Memória: ${data.memory_usage.toFixed(1)}%</p>
         </div>
       `;
-
+  
       container.appendChild(col);
     }
-
-    let cpuUsageChart, cpuHistoryChart;
-
+  
+    let cpuUsageChart, cpuHistoryChart, cpuBarChart, memoryBarChart;
+  
     async function fetchCpuData() {
       try {
         const response = await fetch("/api/cpu-status");
         const data = await response.json();
         updateCpuStatus(data);
-
-        const labels = data.per_core_usage.map((_, i) => `Núcleo ${i}`);
-
-        if (cpuUsageChart) {
-          cpuUsageChart.data.labels = labels;
-          cpuUsageChart.data.datasets[0].data = data.per_core_usage;
-          cpuUsageChart.update();
+  
+        const cpuCtx = document.getElementById("cpuBarChart").getContext("2d");
+        if (cpuBarChart) {
+          cpuBarChart.data.datasets[0].data = [data.total_usage];
+          cpuBarChart.update();
         } else {
-          const ctx = document.getElementById("cpuUsageChart").getContext("2d");
-          cpuUsageChart = new Chart(ctx, {
+          cpuBarChart = new Chart(cpuCtx, {
             type: "bar",
             data: {
-              labels: labels,
+              labels: ["CPU"],
               datasets: [{
-                label: "Uso (%)",
-                data: data.per_core_usage,
-                backgroundColor: "rgba(75, 192, 192, 0.6)"
+                label: "Uso da CPU (%)",
+                data: [data.total_usage],
+                backgroundColor: "rgba(255, 99, 132, 0.6)",
+                borderColor: "rgba(255, 99, 132, 1)",
+                borderWidth: 1
               }]
             },
             options: {
               responsive: true,
               plugins: {
-                legend: { position: "top" }
+                legend: { display: false },
+                title: { display: true, text: "Uso da CPU (%)" }
               },
               scales: {
                 y: { beginAtZero: true, max: 100 }
@@ -141,18 +139,49 @@
             }
           });
         }
+  
+        const memCtx = document.getElementById("memoryBarChart").getContext("2d");
+        if (memoryBarChart) {
+          memoryBarChart.data.datasets[0].data = [data.memory_usage];
+          memoryBarChart.update();
+        } else {
+          memoryBarChart = new Chart(memCtx, {
+            type: "bar",
+            data: {
+              labels: ["Memória"],
+              datasets: [{
+                label: "Uso da Memória (%)",
+                data: [data.memory_usage],
+                backgroundColor: "rgba(54, 162, 235, 0.6)",
+                borderColor: "rgba(54, 162, 235, 1)",
+                borderWidth: 1
+              }]
+            },
+            options: {
+              responsive: true,
+              plugins: {
+                legend: { display: false },
+                title: { display: true, text: "Uso da Memória (%)" }
+              },
+              scales: {
+                y: { beginAtZero: true, max: 100 }
+              }
+            }
+          });
+        }
+  
       } catch (error) {
         console.error("Erro ao buscar dados da CPU:", error);
       }
     }
-
+  
     async function fetchCpuHistory() {
       try {
         const res = await fetch("/api/cpu-history?limit=100");
         const historyData = await res.json();
         const labels = historyData.map(p => p.timestamp);
         const usage = historyData.map(p => p.total_usage);
-
+  
         const ctx = document.getElementById("cpuHistoryChart").getContext("2d");
         if (cpuHistoryChart) {
           cpuHistoryChart.data.labels = labels;
@@ -187,7 +216,7 @@
         console.error("Erro ao carregar histórico da CPU:", e);
       }
     }
-
+  
     fetchCpuData();
     fetchCpuHistory();
     setInterval(fetchCpuData, 10000);
