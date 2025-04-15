@@ -2,6 +2,7 @@ import os
 from flask import Flask
 from .db import db
 from dotenv import load_dotenv
+from .routes.routes import routes_bp
 
 load_dotenv()
 
@@ -20,6 +21,8 @@ def create_app():
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
     db.init_app(app)
+
+    app.register_blueprint(routes_bp)
 
     with app.app_context():
         db.create_all()

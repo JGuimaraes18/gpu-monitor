@@ -18,4 +18,4 @@ COPY docker/wait-for-mysql.sh /wait-for-mysql.sh
 
 RUN chmod +x /wait-for-mysql.sh
 
-CMD ["python", "-m", "app.main"]
+CMD ["python", "-m", "app.run"]

@@ -21,7 +21,7 @@ services:
     depends_on:
       - db
     entrypoint: ["/wait-for-mysql.sh"]
-    command: ["python", "-m", "app.main"]
+    command: ["python", "-m", "app.run"]
 
   db:
     image: mysql:8.0
