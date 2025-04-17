@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Gráficos de CPU</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <h1>Gráficos de CPU - {{ cpu_data['name'] }}</h1>
+    <canvas id="cpuChart"></canvas>
+
+    <script>
+        const cpuData = {{ cpu_data | tojson }};
+        
+        const ctx = document.getElementById("cpuChart").getContext("2d");
+        new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: ['CPU', 'RAM', 'GPU'],
+                datasets: [{
+                    label: 'Uso (%)',
+                    data: [cpuData.cpu_usage, cpuData.memory_usage, cpuData.gpu_usage],
+                    backgroundColor: ['#3498db', '#2ecc71', '#e74c3c']
+                }]
+            },
+            options: {
+                responsive: true,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        max: 100
+                    }
+                }
+            }
+        });
+    </script>
+</body>
+</html>
