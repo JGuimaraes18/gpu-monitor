@@ -12,7 +12,7 @@
 
     <main id="machines-list">
         {% for machine in machines %}
-        <a href="/cpu_check?name={{ machine.name }}" class="machine-item" data-name="{{ machine.name }}">
+        <a href="/host?name={{ machine.name }}" class="machine-item" data-name="{{ machine.name }}">
             <div class="icon">🖥️</div>
             <div class="name">{{ machine.name }}</div>
         </a>
