@@ -21,3 +21,4 @@ def save_to_db(data):
             db.session.add(user_entry)
 
     db.session.commit()
+    

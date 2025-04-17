@@ -1,5 +1,6 @@
 import os
 from flask import Flask
+from app.scheduler import start_scheduler
 from .db import db
 from dotenv import load_dotenv
 from .routes.routes import routes_bp
@@ -26,5 +27,7 @@ def create_app():
 
     with app.app_context():
         db.create_all()
+        start_scheduler(app)
 
     return app
+
