@@ -59,7 +59,7 @@
     </div>
   
     <!-- Abas -->
-    <ul class="nav nav-tabs" id="monitorTabs" role="tablist">
+    <!-- <ul class="nav nav-tabs" id="monitorTabs" role="tablist">
       <li class="nav-item" role="presentation">
         <button class="nav-link active" id="gpu-tab" data-bs-toggle="tab" data-bs-target="#gpu" type="button" role="tab" aria-controls="gpu" aria-selected="true">GPU</button>
       </li>
@@ -67,11 +67,9 @@
         <button class="nav-link" id="cpu-tab" data-bs-toggle="tab" data-bs-target="#cpu" type="button" role="tab" aria-controls="cpu" aria-selected="false">CPU</button>
       </li>
     </ul>
-  
-    <!-- Conteúdo das abas -->
+
     <div class="tab-content mt-4" id="monitorTabsContent">
       
-      <!-- GPU Tab -->
       <div class="tab-pane fade show active" id="gpu" role="tabpanel" aria-labelledby="gpu-tab">
         <h1 class="section-title">Monitoramento de GPU</h1>
         <div class="row g-4" id="statusContainer"></div>
@@ -119,7 +117,6 @@
         </div>
       </div>
   
-      <!-- CPU Tab -->
       <div class="tab-pane fade" id="cpu" role="tabpanel" aria-labelledby="cpu-tab">
         <h1 class="section-title">Monitoramento da CPU</h1>
         <div class="row g-4" id="cpuStatusContainer"></div>
@@ -149,7 +146,113 @@
         </div>
       </div>
     </div>
+  </div> -->
+
+
+
+  <ul class="nav nav-tabs" id="monitorTabs" role="tablist">
+    {% if machine_name == 'pomerode' %}
+    <li class="nav-item" role="presentation">
+      <button class="nav-link active" id="gpu-tab" data-bs-toggle="tab" data-bs-target="#gpu" type="button" role="tab" aria-controls="gpu" aria-selected="true">GPU</button>
+    </li>
+    <li class="nav-item" role="presentation">
+      <button class="nav-link" id="cpu-tab" data-bs-toggle="tab" data-bs-target="#cpu" type="button" role="tab" aria-controls="cpu" aria-selected="false">CPU</button>
+    </li>
+    {% else %}
+    <li class="nav-item" role="presentation">
+      <button class="nav-link active" id="cpu-tab" data-bs-toggle="tab" data-bs-target="#cpu" type="button" role="tab" aria-controls="cpu" aria-selected="true">CPU</button>
+    </li>
+    {% endif %}
+  </ul>
+  
+  <!-- Conteúdo das abas -->
+  <div class="tab-content mt-4" id="monitorTabsContent">
+  
+    {% if machine_name == 'pomerode' %}
+    <!-- GPU Tab -->
+    <div class="tab-pane fade show active" id="gpu" role="tabpanel" aria-labelledby="gpu-tab">
+      <h1 class="section-title">Monitoramento de GPU</h1>
+      <div class="row g-4" id="statusContainer"></div>
+  
+      <div class="row g-4 mt-4">
+        <div class="col-md-6 chart-container">
+          <div class="card p-4">
+            <h5 class="mb-3 text-center">Uso de Memória (MiB)</h5>
+            <canvas id="memChart"></canvas>
+          </div>
+        </div>
+        <div class="col-md-6 chart-container">
+          <div class="card p-4">
+            <h5 class="mb-3 text-center">Consumo de GPU (Watts)</h5>
+            <canvas id="powerChart"></canvas>
+          </div>
+        </div>
+      </div>
+  
+      <div class="row g-4 mt-4">
+        <div class="col-12 chart-container">
+          <div class="card p-4">
+            <h5 class="mb-3 text-center">Histórico de Uso da GPU</h5>
+            <canvas id="gpuHistoryChart" style="max-height: 300px;"></canvas>
+          </div>
+        </div>
+      </div>
+  
+      <div class="row g-4 mt-4">
+        <div class="col-12 chart-container">
+          <div class="card p-4">
+            <h5 class="mb-3 text-center">Histórico de Temperatura (°C)</h5>
+            <canvas id="temperatureChart" style="max-height: 300px;"></canvas>
+          </div>
+        </div>
+      </div>
+  
+      <div class="row g-4 mt-4">
+        <div class="col-12 chart-container">
+          <div class="card p-4">
+            <h5 class="mb-3 text-center">Histórico de Memória Usada (MiB)</h5>
+            <canvas id="memoryChart" style="max-height: 300px;"></canvas>
+          </div>
+        </div>
+      </div>
+    </div>
+  
+    <!-- CPU Tab -->
+    <div class="tab-pane fade" id="cpu" role="tabpanel" aria-labelledby="cpu-tab">
+    {% else %}
+    <!-- CPU Tab Ativa (quando GPU não é exibido) -->
+    <div class="tab-pane fade show active" id="cpu" role="tabpanel" aria-labelledby="cpu-tab">
+    {% endif %}
+      <h1 class="section-title">Monitoramento da CPU</h1>
+      <div class="row g-4" id="cpuStatusContainer"></div>
+  
+      <div class="row g-4 mt-4">
+        <div class="col-md-6 chart-container">
+          <div class="card p-4">
+            <h5 class="mb-3 text-center">CPU</h5>
+            <canvas id="cpuBarChart" style="max-height: 300px;"></canvas>
+          </div>
+        </div>
+        <div class="col-md-6 chart-container">
+          <div class="card p-4">
+            <h5 class="mb-3 text-center">Memória</h5>
+            <canvas id="memoryBarChart" style="max-height: 300px;"></canvas>
+          </div>
+        </div>
+      </div>
+  
+      <div class="row g-4 mt-4">
+        <div class="col-12 chart-container">
+          <div class="card p-4">
+            <h5 class="mb-3 text-center">Histórico de Uso da CPU</h5>
+            <canvas id="cpuHistoryChart" style="max-height: 300px;"></canvas>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
+
+
 </section>
 
   <script>
@@ -251,46 +354,52 @@
       }
     }
   
-    async function fetchCpuHistory() {
-      try {
-        const res = await fetch("/api/cpu-history?limit=100");
-        const historyData = await res.json();
-        const labels = historyData.map(p => p.timestamp);
-        const usage = historyData.map(p => p.total_usage);
-  
-        const ctx = document.getElementById("cpuHistoryChart").getContext("2d");
-        if (cpuHistoryChart) {
-          cpuHistoryChart.data.labels = labels;
-          cpuHistoryChart.data.datasets[0].data = usage;
-          cpuHistoryChart.update();
-        } else {
-          cpuHistoryChart = new Chart(ctx, {
-            type: "line",
+    // CPU HISTORY
+    async function fetchCpuHistory(machine) {
+        const response = await fetch(`/api/cpu-history?machine=${machine}`);
+        const data = await response.json();
+
+        const labels = data.map(entry => entry.timestamp);
+        const values = data.map(entry => entry.value);
+
+        const ctx = document.getElementById('cpuHistoryChart').getContext('2d');
+        new Chart(ctx, {
+            type: 'line',
             data: {
-              labels: labels,
-              datasets: [{
-                label: "Uso Total da CPU (%)",
-                data: usage,
-                borderColor: "rgba(153, 102, 255, 0.8)",
-                backgroundColor: "rgba(153, 102, 255, 0.3)",
-                fill: true
-              }]
+                labels: labels,
+                datasets: [{
+                    label: 'CPU Usage (%)',
+                    data: values,
+                    borderColor: 'rgba(75, 192, 192, 1)',
+                    tension: 0.2,
+                    fill: false,
+                }]
             },
             options: {
-              responsive: true,
-              plugins: {
-                legend: { position: "top" },
-                title: { display: true, text: "Histórico de Uso da CPU" }
-              },
-              scales: {
-                y: { beginAtZero: true, max: 100 }
-              }
+                responsive: true,
+                scales: {
+                    x: {
+                        type: 'time',
+                        time: {
+                            tooltipFormat: 'HH:mm',
+                            unit: 'hour'
+                        },
+                        title: {
+                            display: true,
+                            text: 'Time'
+                        }
+                    },
+                    y: {
+                        min: 0,
+                        max: 100,
+                        title: {
+                            display: true,
+                            text: 'CPU Usage (%)'
+                        }
+                    }
+                }
             }
-          });
-        }
-      } catch (e) {
-        console.error("Erro ao carregar histórico da CPU:", e);
-      }
+        });
     }
 
     // GPU
@@ -520,15 +629,19 @@
       }
     }
 
+    const machineName = "{{ machine_name }}";
+    // const machineName = 'argentina.coids.inpe.br';
+    
     fetchGpuData();
     fetchGpuHistory();
     fetchCpuData();
-    fetchCpuHistory();
+    fetchCpuHistory(machineName);
+
     setInterval(fetchGpuData, 10000);
     setInterval(fetchGpuHistory, 10000);
     setInterval(fetchCpuData, 10000);
-    setInterval(fetchCpuHistory, 10000);
-    
+    setInterval(() => fetchCpuHistory(machineName), 10000);
+
   </script>
 </body>
 </html>

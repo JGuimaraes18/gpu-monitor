@@ -1,4 +1,4 @@
-from app.services.cpu import get_cpu_data
+from app.services.cpu import get_cpu_data, get_cpu_history
 from app.services.gpu import get_gpu_data, get_gpu_data_last_24h
 from app.services.machines import get_all_machines
 from flask import Blueprint, render_template, jsonify, request
@@ -11,7 +11,14 @@ routes_bp = Blueprint("routes", __name__)
 def cpu_status():
     machine_name = request.args.get("machine")
     data = get_cpu_data(machine_name)
-    save_cpu_data(machine_name, data)
+    # save_cpu_data(machine_name, data)
+    return jsonify(data)
+
+@routes_bp.route("/api/cpu-history")
+def cpu_history():
+    machine_name = request.args.get("machine")
+    data = get_cpu_history(machine_name)
+    print(f'data: ', data)
     return jsonify(data)
 
 @routes_bp.route("/api/gpu-status")

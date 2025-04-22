@@ -12,12 +12,12 @@ def start_scheduler(app):
             machine_names_full = get_all_machines()
             machine_names = [entry["name"].split(".")[0] for entry in machine_names_full]
             for machine_name in machine_names:
-                print(machine_name)
                 try:
                     data = get_cpu_data(machine_name)
-                    save_cpu_data(machine_name, data)
+                    # save_cpu_data(machine_name, data)
                 except Exception as e:
-                    print(f"[Scheduler] Erro ao coletar CPU: {e}")
+                    continue
+                    # print(f"[Scheduler] Erro ao coletar CPU: {e}")
 
     scheduler.add_job(collect_cpu_data, 'interval', seconds=60)
     scheduler.start()

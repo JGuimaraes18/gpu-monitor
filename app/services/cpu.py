@@ -1,3 +1,5 @@
+import time
+from datetime import datetime
 from flask import jsonify
 from app.zabbix.zabbix import connect_zabbix, get_HostsItems, get_hostgroup
 
@@ -93,12 +95,110 @@ def get_status_data_zabbix(items):
 
     return data
 
-# def cpu_check():
-#     apt = connect_zabbix()
-#     hostgroup_name = "pomerode"
-#     hostgroup_info = get_hostgroup(hostgroup_name, apt)
-#     hostgroup_id = ''
-#     for gi in hostgroup_info:
-#         if gi['groupid'] == '30':
-#             hostgroup_id = gi['groupid']
-#     hostgroups,hosts,items=get_HostsItems(apt, hostgroup_id)
+# def get_cpu_history(machine_name):
+#     # machine_name = 'argentina.coids.inpe.br'
+#     zapi = connect_zabbix()
+
+#     # Opcional: ajuste conforme seu hostgroup
+#     hostgroup = get_hostgroup("Linux servers GPU", zapi)
+#     if not hostgroup:
+#         return []
+
+#     # Busca o host
+#     host = zapi.host.get(filter={"host": machine_name})
+#     print('HOST: ', host)
+#     if not host:
+#         return []
+
+#     hostid = host[0]["hostid"]
+
+#     # Busca item de CPU
+#     items = zapi.item.get(hostids=hostid, filter={"name": "CPU usage"}, output=["itemid", "name"])
+#     if not items:
+#         return []
+
+#     itemid = items[0]["itemid"]
+
+#     # Pega últimos 24h
+#     time_till = int(time.time())
+#     time_from = time_till - 86400  # 24 horas
+
+#     history = zapi.history.get(
+#         itemids=itemid,
+#         time_from=time_from,
+#         time_till=time_till,
+#         output='extend',
+#         history=0,  # float
+#         sortfield='clock',
+#         sortorder='ASC',
+#         limit=1000
+#     )
+
+#     result = []
+#     for h in history:
+#         result.append({
+#             "timestamp": datetime.fromtimestamp(int(h["clock"])).strftime('%Y-%m-%d %H:%M:%S'),
+#             "value": float(h["value"])
+#         })
+
+#     return result
+
+
+
+def get_cpu_history(machine_name):
+    zapi = connect_zabbix()
+
+    all_hosts = zapi.host.get(output=["hostid", "host"])
+
+    matched_host = next((h for h in all_hosts if machine_name in h["host"]), None)
+    
+    if not matched_host:
+        print(f"[WARN] Host '{machine_name}' não encontrado no Zabbix.")
+        return []
+
+    hostid = matched_host["hostid"]
+
+    items = zapi.item.get(hostids=hostid, filter={"name": "CPU utilization"}, output=["itemid", "name"])
+    # for item in items:
+    #     print(item["name"])
+
+    if not items:
+        print("[ERRO] Item não encontrado.")
+        return []
+
+    item = items[0]
+    itemid = item["itemid"]
+    value_type = int(item["value_type"])
+
+    print(f"Item: {item['name']}, Tipo: {value_type}")
+
+    
+    if not items:
+        return []
+
+    itemid = items[0]["itemid"]
+
+    # Pega últimos 24h
+    time_till = int(time.time())
+    time_from = time_till - 86400
+
+    history = zapi.history.get(
+        itemids=itemid,
+        time_from=time_from,
+        time_till=time_till,
+        output='extend',
+        history=0,  
+        sortfield='clock',
+        sortorder='ASC',
+        limit=1000
+    )
+
+    print('aquiiiiiiiiiii: ', history)
+    result = []
+    for h in history:
+        result.append({
+            "timestamp": datetime.fromtimestamp(int(h["clock"])).strftime('%Y-%m-%d %H:%M:%S'),
+            "value": float(h["value"])
+        })
+
+    return result

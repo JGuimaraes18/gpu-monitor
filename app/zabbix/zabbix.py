@@ -2,7 +2,6 @@ from dotenv import load_dotenv
 import os 
 from pyzabbix import ZabbixAPI
 
-
 load_dotenv()
 
 def connect_zabbix():
@@ -25,3 +24,5 @@ def get_HostsItems(api,hostgroup_id):
 def get_hostgroup(hostgroup_name,api):
     hostgroup = api.hostgroup.get({"output": "extend", "filter": {"name": hostgroup_name}})
     return hostgroup
+
+
