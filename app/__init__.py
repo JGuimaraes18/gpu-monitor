@@ -8,7 +8,8 @@ from .routes.routes import routes_bp
 load_dotenv()
 
 def create_app():
-    app = Flask(__name__)
+    # app = Flask(__name__)
+    app = Flask(__name__, static_url_path='/static1', static_folder='static1')
 
     DB_USER = os.getenv("DB_USER")
     DB_PASS = os.getenv("DB_PASS")
